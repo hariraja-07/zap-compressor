@@ -33,12 +33,13 @@ func (c *Compressor) CompressFile(source string) (string, error) {
 	}
 
 	var output string
+	var outputFile *os.File
 	var writer io.WriteCloser
 
 	switch c.Mode {
 	case ModeFast, ModeUltra:
 		output = source + ".tar.zst"
-		f, err := os.Create(output)
+		outputFile, err = os.Create(output)
 		if err != nil {
 			return "", fmt.Errorf("create archive: %w", err)
 		}
@@ -46,22 +47,22 @@ func (c *Compressor) CompressFile(source string) (string, error) {
 		if c.Mode == ModeUltra {
 			level = zstd.SpeedBetterCompression
 		}
-		encoder, err := zstd.NewWriter(f, zstd.WithEncoderLevel(level))
+		encoder, err := zstd.NewWriter(outputFile, zstd.WithEncoderLevel(level))
 		if err != nil {
-			f.Close()
+			outputFile.Close()
 			os.Remove(output)
 			return "", fmt.Errorf("create zstd encoder: %w", err)
 		}
 		writer = encoder
 	case ModeNormal:
 		output = source + ".tar.gz"
-		f, err := os.Create(output)
+		outputFile, err = os.Create(output)
 		if err != nil {
 			return "", fmt.Errorf("create archive: %w", err)
 		}
-		encoder, err := zstd.NewWriter(f, zstd.WithEncoderLevel(zstd.SpeedDefault))
+		encoder, err := zstd.NewWriter(outputFile, zstd.WithEncoderLevel(zstd.SpeedDefault))
 		if err != nil {
-			f.Close()
+			outputFile.Close()
 			os.Remove(output)
 			return "", fmt.Errorf("create gzip encoder: %w", err)
 		}
@@ -71,7 +72,7 @@ func (c *Compressor) CompressFile(source string) (string, error) {
 	tw := tar.NewWriter(writer)
 
 	baseDir := filepath.Base(source)
-	filepath.Walk(source, func(path string, info os.FileInfo, err error) error {
+	err = filepath.Walk(source, func(walkPath string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -79,12 +80,12 @@ func (c *Compressor) CompressFile(source string) (string, error) {
 		if err != nil {
 			return err
 		}
-		header.Name = filepath.Join(baseDir, path)
+		header.Name = filepath.Join(baseDir, walkPath)
 		if err := tw.WriteHeader(header); err != nil {
 			return err
 		}
 		if !info.IsDir() {
-			f, err := os.Open(path)
+			f, err := os.Open(walkPath)
 			if err != nil {
 				return err
 			}
@@ -93,6 +94,10 @@ func (c *Compressor) CompressFile(source string) (string, error) {
 		}
 		return nil
 	})
+	if err != nil {
+		os.Remove(output)
+		return "", fmt.Errorf("walk source: %w", err)
+	}
 
 	if err := tw.Close(); err != nil {
 		os.Remove(output)
@@ -100,6 +105,7 @@ func (c *Compressor) CompressFile(source string) (string, error) {
 	}
 
 	writer.Close()
+	outputFile.Close()
 
 	if info.IsDir() {
 		os.RemoveAll(source)
