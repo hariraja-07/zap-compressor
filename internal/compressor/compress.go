@@ -76,7 +76,14 @@ func (c *Compressor) CompressFile(source string) (string, error) {
 		if err != nil {
 			return err
 		}
-		header, err := tar.FileInfoHeader(info, "")
+		link := ""
+		if info.Mode()&os.ModeSymlink != 0 {
+			link, err = os.Readlink(walkPath)
+			if err != nil {
+				return err
+			}
+		}
+		header, err := tar.FileInfoHeader(info, link)
 		if err != nil {
 			return err
 		}
