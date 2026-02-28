@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/klauspost/compress/gzip"
 	"github.com/klauspost/compress/zstd"
 )
 
@@ -16,6 +17,7 @@ const (
 	ModeFast CompressionMode = iota
 	ModeNormal
 	ModeUltra
+	ModeZip
 )
 
 type Compressor struct {
@@ -27,14 +29,24 @@ func NewCompressor(mode CompressionMode) *Compressor {
 }
 
 func (c *Compressor) CompressFile(source string) (string, error) {
-	info, err := os.Stat(source)
+	info, err := os.Lstat(source)
 	if err != nil {
 		return "", fmt.Errorf("stat source: %w", err)
 	}
 
+	switch c.Mode {
+	case ModeZip:
+		return c.compressZip(source, info)
+	default:
+		return c.compressTar(source, info)
+	}
+}
+
+func (c *Compressor) compressTar(source string, sourceInfo os.FileInfo) (string, error) {
 	var output string
 	var outputFile *os.File
 	var writer io.WriteCloser
+	var err error
 
 	switch c.Mode {
 	case ModeFast, ModeUltra:
@@ -72,11 +84,13 @@ func (c *Compressor) CompressFile(source string) (string, error) {
 	tw := tar.NewWriter(writer)
 
 	baseDir := filepath.Base(source)
+	_ = baseDir
 	err = filepath.Walk(source, func(walkPath string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
-		link := ""
+
+		var link string
 		if info.Mode()&os.ModeSymlink != 0 {
 			link, err = os.Readlink(walkPath)
 			if err != nil {
@@ -87,11 +101,11 @@ func (c *Compressor) CompressFile(source string) (string, error) {
 		if err != nil {
 			return err
 		}
-		header.Name = filepath.Join(baseDir, walkPath)
+		header.Name = walkPath
 		if err := tw.WriteHeader(header); err != nil {
 			return err
 		}
-		if !info.IsDir() {
+		if !info.IsDir() && link == "" {
 			f, err := os.Open(walkPath)
 			if err != nil {
 				return err
@@ -114,7 +128,71 @@ func (c *Compressor) CompressFile(source string) (string, error) {
 	writer.Close()
 	outputFile.Close()
 
-	if info.IsDir() {
+	if sourceInfo.IsDir() {
+		os.RemoveAll(source)
+	} else {
+		os.Remove(source)
+	}
+
+	return output, nil
+}
+
+func (c *Compressor) compressZip(source string, sourceInfo os.FileInfo) (string, error) {
+	output := source + ".zip"
+	outputFile, err := os.Create(output)
+	if err != nil {
+		return "", fmt.Errorf("create archive: %w", err)
+	}
+	defer outputFile.Close()
+
+	gw := gzip.NewWriter(outputFile)
+	defer gw.Close()
+
+	tw := tar.NewWriter(gw)
+
+	baseDir := filepath.Base(source)
+	_ = baseDir
+	err = filepath.Walk(source, func(walkPath string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		var link string
+		if info.Mode()&os.ModeSymlink != 0 {
+			link, err = os.Readlink(walkPath)
+			if err != nil {
+				return err
+			}
+		}
+		header, err := tar.FileInfoHeader(info, link)
+		if err != nil {
+			return err
+		}
+		header.Name = walkPath
+		if err := tw.WriteHeader(header); err != nil {
+			return err
+		}
+		if !info.IsDir() && link == "" {
+			f, err := os.Open(walkPath)
+			if err != nil {
+				return err
+			}
+			defer f.Close()
+			io.Copy(tw, f)
+		}
+		return nil
+	})
+	if err != nil {
+		os.Remove(output)
+		return "", fmt.Errorf("walk source: %w", err)
+	}
+
+	if err := tw.Close(); err != nil {
+		os.Remove(output)
+		return "", fmt.Errorf("close tar: %w", err)
+	}
+
+	if sourceInfo.IsDir() {
 		os.RemoveAll(source)
 	} else {
 		os.Remove(source)
