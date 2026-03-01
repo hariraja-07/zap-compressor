@@ -145,7 +145,12 @@ func (c *Compressor) compressZip(source string, sourceInfo os.FileInfo) (string,
 	}
 	defer outputFile.Close()
 
-	gw := gzip.NewWriter(outputFile)
+	gw, err := gzip.NewWriterLevel(outputFile, gzip.BestCompression)
+	if err != nil {
+		outputFile.Close()
+		os.Remove(output)
+		return "", fmt.Errorf("create gzip encoder: %w", err)
+	}
 	defer gw.Close()
 
 	tw := tar.NewWriter(gw)
