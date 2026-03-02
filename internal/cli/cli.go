@@ -49,6 +49,8 @@ func compress(target string) error {
 		modeVal = compressor.ModeUltra
 	case "fast":
 		modeVal = compressor.ModeFast
+	case "zip":
+		modeVal = compressor.ModeZip
 	default:
 		modeVal = compressor.ModeNormal
 	}
