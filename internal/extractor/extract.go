@@ -1,59 +1,88 @@
 package extractor
 
 import (
+	"archive/tar"
+	"bytes"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 
-	"archive/tar"
-	"github.com/klauspost/compress/zstd"
+	"github.com/klauspost/compress/gzip"
 )
 
-func Extract(archive string) error {
-	info, err := os.Stat(archive)
-	if err != nil {
-		return fmt.Errorf("stat archive: %w", err)
-	}
+var magicBytes = []map[string][]byte{
+	{".zst": []byte{0x28, 0xb5, 0x2f, 0xfd}}, // zstd magic
+	{".gz": []byte{0x1f, 0x8b}},              // gzip magic
+}
 
-	extractedDir := filepath.Base(archive)
-	for _, ext := range []string{".tar.zst", ".tar.gz", ".tar.xz"} {
-		if len(extractedDir) > len(ext) {
-			extractedDir = extractedDir[:len(extractedDir)-len(ext)]
+func detectFormat(data []byte) string {
+	for _, m := range magicBytes {
+		for ext, magic := range m {
+			if len(data) >= len(magic) && bytes.Equal(data[:len(magic)], magic) {
+				return ext
+			}
 		}
 	}
+	return ""
+}
 
-	if err := os.MkdirAll(extractedDir, info.Mode()); err != nil {
-		return fmt.Errorf("create output dir: %w", err)
-	}
-
+func Extract(archive string) error {
 	f, err := os.Open(archive)
 	if err != nil {
 		return fmt.Errorf("open archive: %w", err)
 	}
 	defer f.Close()
 
-	var reader io.Reader
-	switch {
-	case len(archive) > 5 && archive[len(archive)-5:] == ".zst":
-		zstdReader, err := zstd.NewReader(f)
-		if err != nil {
-			return fmt.Errorf("zstd decode: %w", err)
+	buf := make([]byte, 8)
+	n, err := f.Read(buf)
+	if err != nil || n == 0 {
+		return fmt.Errorf("empty or unreadable archive")
+	}
+
+	format := detectFormat(buf)
+	if format == "" {
+		if len(archive) > 4 && archive[len(archive)-4:] == ".zip" {
+			format = ".zip"
+		} else {
+			return fmt.Errorf("unsupported archive format")
 		}
-		reader = zstdReader
+	}
+
+	f.Seek(0, 0)
+
+	var reader io.Reader
+	switch format {
+	case ".zst", ".gz":
+		gr, err := gzip.NewReader(f)
+		if err != nil {
+			return fmt.Errorf("gzip decode: %w", err)
+		}
+		defer gr.Close()
+		reader = gr
 	default:
-		return fmt.Errorf("unsupported format")
+		return fmt.Errorf("unsupported format: %s", format)
 	}
 
 	tr := tar.NewReader(reader)
+
+	extractedDir := filepath.Base(archive)
+	for _, ext := range []string{".tar.zst", ".tar.gz", ".tar.xz", ".zip"} {
+		if len(extractedDir) >= len(ext) {
+			extractedDir = extractedDir[:len(extractedDir)-len(ext)]
+		}
+	}
+
+	hasContent := false
 	for {
 		header, err := tr.Next()
 		if err == io.EOF {
 			break
 		}
 		if err != nil {
-			return fmt.Errorf("read tar: %w", err)
+			return fmt.Errorf("read tar header: %w", err)
 		}
+		hasContent = true
 
 		path := filepath.Join(extractedDir, header.Name)
 		switch header.Typeflag {
@@ -79,6 +108,10 @@ func Extract(archive string) error {
 				return fmt.Errorf("create symlink: %w", err)
 			}
 		}
+	}
+
+	if !hasContent {
+		return fmt.Errorf("archive is empty")
 	}
 
 	os.Remove(archive)
