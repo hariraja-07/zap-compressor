@@ -110,6 +110,7 @@ func Extract(archive string) error {
 		}
 	}
 
+	// Handle empty archive - was causing nil pointer panic before
 	if !hasContent {
 		return fmt.Errorf("archive is empty")
 	}
