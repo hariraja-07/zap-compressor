@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/zap-tool/zap/internal/compressor"
@@ -56,7 +57,17 @@ func compress(target string) error {
 	}
 
 	c := compressor.NewCompressor(modeVal)
+	c.Progress = func(current, total int64) {
+		if total > 0 {
+			pct := int(float64(current) / float64(total) * 100)
+			bar := strings.Repeat("=", pct/5) + strings.Repeat(".", 20-pct/5)
+			fmt.Printf("\r[%s] %d%%", bar, pct)
+		}
+	}
 	archive, err := c.CompressFile(target)
+	if c.Progress != nil {
+		fmt.Println()
+	}
 	if err != nil {
 		return fmt.Errorf("compression failed: %w", err)
 	}

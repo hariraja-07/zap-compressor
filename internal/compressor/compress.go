@@ -21,7 +21,8 @@ const (
 )
 
 type Compressor struct {
-	Mode CompressionMode
+	Mode     CompressionMode
+	Progress func(current, total int64)
 }
 
 func NewCompressor(mode CompressionMode) *Compressor {
