@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -57,9 +58,25 @@ func compress(target string) error {
 	}
 
 	c := compressor.NewCompressor(modeVal)
+	var totalSize int64
+	calcSize := func(path string) int64 {
+		var size int64
+		filepath.Walk(path, func(p string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+			if !info.IsDir() {
+				size += info.Size()
+			}
+			return nil
+		})
+		return size
+	}
+	totalSize = calcSize(target)
+
 	c.Progress = func(current, total int64) {
-		if total > 0 {
-			pct := int(float64(current) / float64(total) * 100)
+		if totalSize > 0 {
+			pct := int(float64(current) / float64(totalSize) * 100)
 			bar := strings.Repeat("=", pct/5) + strings.Repeat(".", 20-pct/5)
 			fmt.Printf("\r[%s] %d%%", bar, pct)
 		}
