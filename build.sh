@@ -23,6 +23,7 @@ for PLATFORM in "${PLATFORMS[@]}"; do
 	GOARCH=$(echo $PLATFORM | cut -d'/' -f2)
 	OUTPUT="zap-${VERSION}-${GOOS}-${GOARCH}"
 	
+	# Add .exe extension for Windows builds
 	if [ "$GOOS" = "windows" ]; then
 		OUTPUT="${OUTPUT}.exe"
 	fi
