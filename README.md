@@ -1,78 +1,98 @@
-# ⚡ ZAP - Smart Compression Tool
+# ZAP - Smart Compression Tool
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)  
-![Shell Script](https://img.shields.io/badge/Shell_Script-121011?logo=gnu-bash&logoColor=white)
+![Go](https://img.shields.io/badge/Go-1.24-blue?logo=go)
 
 > **One-command compression and extraction with auto-cleanup.**  
 > Lightweight, fast, and smart – just `zap` it!
 
 ---
 
-## 🚀 Quick Start
+## Installation
 
-### 🔧 Install Dependencies
-
-```bash
-sudo apt install zstd p7zip-full
-```
-
-### 📥 Download and Install
+### Download Pre-built Binary
 
 ```bash
-git clone https://github.com/yourusername/zap-compressor.git
-cd zap-compressor
-sudo cp zap /usr/local/bin/
+# Linux
+curl -L https://github.com/zap-tool/zap/releases/download/v1.0.0/zap-1.0.0-linux-amd64 -o zap
+chmod +x zap
+
+# macOS
+curl -L https://github.com/zap-tool/zap/releases/download/v1.0.0/zap-1.0.0-darwin-amd64 -o zap
+chmod +x zap
+
+# Windows
+curl -L https://github.com/zap-tool/zap/releases/download/v1.0.0/zap-1.0.0-windows-amd64.exe -o zap.exe
 ```
 
- ---
-
-## 💻 Usage
-
-### ⚙️ Compression
+### Build from Source
 
 ```bash
-zap <file/folder>         # Fast compression using zstd
-zap -u <file/folder>      # Ultra compression using 7z
+git clone https://github.com/zap-tool/zap.git
+cd zap
+./build.sh
 ```
-
-> 🗃️ Creates `archive.zst` or `archive.7z` and **deletes the original**.
 
 ---
 
-### 📦 Extraction
+## Usage
+
+### Compression
 
 ```bash
-zap <archive.zst/.7z>     # Auto-detect and extract
+zap <file|folder>         # Fast compression (tar.zst)
+zap -m fast <file>        # Fast compression
+zap -m normal <file>     # Normal compression (tar.gz)
+zap -m ultra <file>      # Ultra compression (zstd max)
+zap -m zip <file>       # Zip format
 ```
 
-> 🔄 Restores original files/folders and **deletes the archive**.
+> Creates archive and **deletes the original**.
 
 ---
 
-## ✨ Features
+### Extraction
 
-- ✅ **Automatic format detection**
-- ♻️ **Self-cleaning** (removes source after operation)
-- 🚀 **Two compression modes**: Fast (zstd) and Ultra (7z)
-- 🔐 **Preserves file permissions and attributes**
-- 💡 **Simple & minimal interface**
+```bash
+zap <archive.tar.zst>    # Auto-detect and extract
+zap extract <archive>
+```
 
----
-
-## 🤝 Contributing & Support
-
-As a new GitHub user, I welcome:
-
-- 🐛 Bug reports  
-- 💡 Feature requests  
-- 🛠️ Pull requests  
-- 📚 Documentation improvements
-
-> Please open an [issue](https://github.com/yourusername/zap-compressor/issues) for suggestions or problems!
+> Restores files and **deletes the archive**.
 
 ---
 
-## 📄 License
+## Options
 
-This project is licensed under the [MIT License](LICENSE).
+| Flag | Description | Default |
+|------|------------|---------|
+| `-m, --mode` | Compression mode | `fast` |
+| `-h, --help` | Show help | - |
 
+---
+
+## Compression Modes
+
+| Mode | Format | Speed | Ratio |
+|------|-------|-------|-------|
+| `fast` | `.tar.zst` | Fastest | Good |
+| `normal` | `.tar.gz` | Normal | Better |
+| `ultra` | `.tar.zst` | Slow | Best |
+| `zip` | `.zip` | Normal | Standard |
+
+---
+
+## Features
+
+- ✅ **Self-contained** (no external dependencies)
+- ✅ **Cross-platform** (Linux, macOS, Windows)
+- ✅ **Auto-detect format** on extraction
+- ✅ **Progress bars** during compression
+- ✅ **Preserves symlinks**
+- ✅ **Auto-cleanup** (deletes source after operation)
+
+---
+
+## License
+
+MIT License - see [LICENSE](LICENSE)
