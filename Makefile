@@ -1,5 +1,6 @@
 .PHONY: build test clean install release
 
+# ZAP Makefile - Build automation
 VERSION := 1.0.0
 
 build:
