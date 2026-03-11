@@ -1,5 +1,7 @@
 name: Release
 
+# CI workflow - builds on push to main and releases on tags
+
 on:
   push:
     tags:
