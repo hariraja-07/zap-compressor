@@ -32,7 +32,11 @@ func NewCompressor(mode CompressionMode) *Compressor {
 
 func (c *Compressor) CompressFile(source string) (string, error) {
 	// Trim trailing slashes to avoid creating hidden files like "folder/.tar.gz"
+	// Also handles Windows backslashes
 	source = strings.TrimRight(strings.TrimRight(source, "/"), "\\")
+
+	// Validate source exists after trimming path
+	// Early return prevents deleting non-existent source
 
 	// Validate source exists before any operation
 	info, err := os.Lstat(source)
