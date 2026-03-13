@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/klauspost/compress/gzip"
 	"github.com/klauspost/compress/zstd"
@@ -30,8 +31,15 @@ func NewCompressor(mode CompressionMode) *Compressor {
 }
 
 func (c *Compressor) CompressFile(source string) (string, error) {
+	// Trim trailing slashes to avoid creating hidden files like "folder/.tar.gz"
+	source = strings.TrimRight(strings.TrimRight(source, "/"), "\\")
+
+	// Validate source exists before any operation
 	info, err := os.Lstat(source)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return "", fmt.Errorf("source does not exist: %s", source)
+		}
 		return "", fmt.Errorf("stat source: %w", err)
 	}
 
@@ -129,6 +137,12 @@ func (c *Compressor) compressTar(source string, sourceInfo os.FileInfo) (string,
 	writer.Close()
 	outputFile.Close()
 
+	// Verify archive was created successfully before deleting source
+	if _, err := os.Stat(output); err != nil {
+		return "", fmt.Errorf("archive creation failed: %w", err)
+	}
+
+	// Only delete source AFTER successful compression
 	if sourceInfo.IsDir() {
 		os.RemoveAll(source)
 	} else {
@@ -198,6 +212,12 @@ func (c *Compressor) compressZip(source string, sourceInfo os.FileInfo) (string,
 		return "", fmt.Errorf("close tar: %w", err)
 	}
 
+	// Verify archive was created successfully before deleting source
+	if _, err := os.Stat(output); err != nil {
+		return "", fmt.Errorf("archive creation failed: %w", err)
+	}
+
+	// Only delete source AFTER successful compression
 	if sourceInfo.IsDir() {
 		os.RemoveAll(source)
 	} else {
