@@ -27,6 +27,7 @@ func detectFormat(data []byte) string {
 	return ""
 }
 
+// Extract handles archive extraction with proper error handling
 func Extract(archive string) error {
 	f, err := os.Open(archive)
 	if err != nil {
